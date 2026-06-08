@@ -226,6 +226,12 @@ function pushIfDirty() {
 // --------------------------------------------------------------------------
 function main() {
   log('=== tick start ===');
+  // Pause switch: while this sentinel exists, do nothing (no scrape kicked, no Smyths hit).
+  // Resume = remove it and re-bootstrap the launchd job.
+  if (fs.existsSync(path.join(ROOT, 'PAUSED'))) {
+    log('PAUSED sentinel present — skipping tick (no scrape kicked).');
+    return;
+  }
   if (!dockerOk()) { log('FATAL: docker or image unavailable — self-heal needed (rebuild image)'); process.exit(2); }
   killStuck();
   const n = ingest();
