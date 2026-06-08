@@ -1,1 +1,79 @@
-[]
+[
+  {
+    "ts": "20260608T183044Z",
+    "status": "success",
+    "env": "docker (linux/amd64)",
+    "attempted": 40,
+    "success": 40,
+    "successRatePct": 100,
+    "captchas": {
+      "detected": 1,
+      "solved": 1
+    },
+    "torRotations": 1,
+    "changeCount": 0,
+    "durationSec": 278,
+    "note": "First clean container run after the Tor-rotation fix. Hit one Imperva doodle captcha, solved it on attempt 1, one Tor exit rotation. Diffed against the previous run: 40/40 products identical — catalog stable, no price/stock changes.",
+    "breakdown": {
+      "attempted": 40,
+      "success": 40,
+      "redirect": 0,
+      "captchaFail": 0,
+      "block": 0,
+      "parseFail": 0,
+      "error": 0
+    }
+  },
+  {
+    "ts": "20260608T182007Z",
+    "status": "success",
+    "env": "local node (visible Chrome, debug)",
+    "attempted": 40,
+    "success": 40,
+    "successRatePct": 100,
+    "captchas": {
+      "detected": 0,
+      "solved": 0
+    },
+    "torRotations": 1,
+    "changeCount": 0,
+    "durationSec": 243,
+    "note": "Local verification run. Drew a clean Tor exit on the first circuit — zero captcha walls, so the solver never had to fire. Proved the extraction + parse + report pipeline end to end.",
+    "breakdown": {
+      "attempted": 40,
+      "success": 40,
+      "redirect": 0,
+      "captchaFail": 0,
+      "block": 0,
+      "parseFail": 0,
+      "error": 0
+    }
+  },
+  {
+    "ts": "20260608T175929Z",
+    "status": "failed",
+    "env": "docker (linux/amd64)",
+    "attempted": 0,
+    "success": 0,
+    "successRatePct": 0,
+    "captchas": {
+      "detected": 6,
+      "solved": 0
+    },
+    "torRotations": 0,
+    "changeCount": 0,
+    "exitCode": 124,
+    "durationSec": 600,
+    "note": "First container run — surfaced a real bug. The Dockerfile baked a Tor control-password hash that did not match the plaintext the app sends, so every NEWNYM exit-rotation failed auth (515). The container got stuck on a flagged Tor exit it could never leave, looping on captcha walls the overloaded free vision providers (Gemini 503, Groq 429) could not clear. Fixed: hash now generated at build time from the real password, rotateExit() verifies the 250 OK reply, and the container self-checks auth at boot. Next run (above) was clean.",
+    "errorTail": "[solve] vision: gemini-native 503 high demand -> rotate\n[solve] solve: wrong/looped on attempt 3\n[warm] solver gave up — rotating Tor exit\n(rotation silently no-op: 515 Authentication failed)",
+    "breakdown": {
+      "attempted": 0,
+      "success": 0,
+      "redirect": 0,
+      "captchaFail": 6,
+      "block": 0,
+      "parseFail": 0,
+      "error": 0
+    }
+  }
+]

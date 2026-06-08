@@ -1,8 +1,8 @@
 {
-  "totalRuns": 0,
-  "last24hRuns": 0,
-  "last24hSuccessRatePct": null,
+  "totalRuns": 3,
+  "last24hRuns": 3,
+  "last24hSuccessRatePct": 100,
   "last24hChangeCount": 0,
-  "lastRunTs": null,
-  "lastRunStatus": null
+  "lastRunTs": "20260608T183044Z",
+  "lastRunStatus": "success"
 }
