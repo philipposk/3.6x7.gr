@@ -1,5 +1,73 @@
 [
   {
+    "ts": "2026-06-08T20:04:27.990Z",
+    "runTag": "20260608T200103Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 2,
+    "solved": true,
+    "legend": [
+      "clock",
+      "tree",
+      "cloud"
+    ],
+    "image": "20260608T200103Z_doodle_a02_solved.png"
+  },
+  {
+    "ts": "2026-06-08T20:04:08.606Z",
+    "runTag": "20260608T200103Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 1,
+    "solved": false,
+    "legend": [
+      "bear",
+      "hamburger"
+    ],
+    "image": "20260608T200103Z_doodle_a01_failed.png"
+  },
+  {
+    "ts": "2026-06-08T20:03:25.354Z",
+    "runTag": "20260608T200103Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 3,
+    "solved": false,
+    "legend": [
+      "flamingo",
+      "flying saucer"
+    ],
+    "image": "20260608T200103Z_doodle_a03_failed.png"
+  },
+  {
+    "ts": "2026-06-08T20:02:58.667Z",
+    "runTag": "20260608T200103Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 2,
+    "solved": false,
+    "legend": [
+      "necklace",
+      "teddy bear",
+      "coins"
+    ],
+    "image": "20260608T200103Z_doodle_a02_failed.png"
+  },
+  {
+    "ts": "2026-06-08T20:02:29.823Z",
+    "runTag": "20260608T200103Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 1,
+    "solved": false,
+    "legend": [
+      "chair",
+      "wine glass",
+      "bird"
+    ],
+    "image": "20260608T200103Z_doodle_a01_failed.png"
+  },
+  {
     "ts": "2026-06-08T18:50:26.058Z",
     "runTag": "20260608T184919Z",
     "type": "doodle",

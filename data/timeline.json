@@ -1,5 +1,28 @@
 [
   {
+    "ts": "20260608T200103Z",
+    "status": "success",
+    "attempted": 40,
+    "success": 40,
+    "successRatePct": 100,
+    "captchas": {
+      "detected": 2,
+      "solved": 1
+    },
+    "torRotations": 2,
+    "changeCount": 0,
+    "durationSec": 435,
+    "breakdown": {
+      "attempted": 40,
+      "success": 40,
+      "redirect": 0,
+      "captchaFail": 0,
+      "block": 0,
+      "parseFail": 0,
+      "error": 0
+    }
+  },
+  {
     "ts": "20260608T184919Z",
     "status": "success",
     "attempted": 40,
