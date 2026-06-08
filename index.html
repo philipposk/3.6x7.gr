@@ -264,6 +264,20 @@
   }
   .heal-event .he-ts { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 
+  /* Agent activity */
+  .agent-row { display: flex; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 8px 0; }
+  .agent-row.fix { border-left: 3px solid var(--bad); }
+  .agent-row.improve { border-left: 3px solid var(--accent); }
+  .agent-row.heal { border-left: 3px solid #e0a020; }
+  .agent-row.review { border-left: 3px solid var(--good); }
+  .agent-kind { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; height: fit-content; border-radius: 4px; background: var(--bg-elev); color: var(--muted); white-space: nowrap; }
+  .agent-kind.fix { color: var(--bad); } .agent-kind.improve { color: var(--accent); } .agent-kind.review { color: var(--good); }
+  .agent-body { flex: 1; min-width: 0; }
+  .agent-title { font-size: 14px; color: var(--fg); font-weight: 600; }
+  .agent-repo { font-family: var(--mono); font-size: 10.5px; color: var(--muted); background: var(--bg-elev); padding: 1px 6px; border-radius: 4px; font-weight: 400; }
+  .agent-detail { font-size: 13px; color: var(--fg-dim); margin: 4px 0 6px; }
+  .he-ts { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
   /* Links grid */
   .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
   .link-card {
@@ -322,6 +336,7 @@
     <a href="#captchas">captchas</a>
     <a href="#issues">issues</a>
     <a href="#heal">self-heal</a>
+    <a href="#agent">agent</a>
     <a href="#repos">repos</a>
     <span class="spacer"></span>
     <button class="theme-toggle" id="themeToggle" type="button">theme</button>
@@ -431,6 +446,12 @@
     </div>
     <h4 style="margin:18px 0 8px">Recent failure / heal events</h4>
     <div id="healWrap"><div class="empty">No failures recorded yet.</div></div>
+  </section>
+
+  <section id="agent">
+    <h2>Agent activity</h2>
+    <p>What the Claude Code agent has actually done to this project &mdash; fixes, improvements, and reviews &mdash; newest first. Every entry corresponds to a real commit you can review in the repos.</p>
+    <div id="agentWrap"><div class="empty">Loading agent activity&hellip;</div></div>
   </section>
 
   <section id="repos">
@@ -800,6 +821,26 @@
     }).join('');
   }
 
+  // --- Agent activity (Claude Code fixes / improvements) ------------------
+  function renderAgentLog(entries) {
+    const wrap = $('agentWrap');
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) { wrap.innerHTML = '<div class="empty">No agent activity logged yet.</div>'; return; }
+    const sorted = list.slice().sort((a, b) => parseTs(b.ts).getTime() - parseTs(a.ts).getTime());
+    wrap.innerHTML = sorted.slice(0, 30).map((e) => {
+      const kind = (e.kind || 'note').toLowerCase();
+      return '<div class="agent-row ' + kind + '">' +
+        '<span class="agent-kind ' + kind + '">' + escapeHtml(kind) + '</span>' +
+        '<div class="agent-body">' +
+          '<div class="agent-title">' + escapeHtml(e.title || '') +
+            (e.repo ? ' <span class="agent-repo">' + escapeHtml(e.repo) + '</span>' : '') + '</div>' +
+          (e.detail ? '<div class="agent-detail">' + escapeHtml(e.detail) + '</div>' : '') +
+          '<div class="he-ts">' + escapeHtml(fmtTs(e.ts)) + ' · ' + escapeHtml(fmtRel(e.ts)) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
   // --- Load + refresh -----------------------------------------------------
   async function loadAll() {
     const results = await Promise.allSettled([
@@ -807,18 +848,21 @@
       fetchJson('data/latest-changes.json'),
       fetchJson('data/run-summary.json'),
       fetchJson('data/captchas/captchas.json'),
+      fetchJson('data/agent-log.json'),
     ]);
 
     const timeline = results[0].status === 'fulfilled' && Array.isArray(results[0].value) ? results[0].value : [];
     const latestChanges = results[1].status === 'fulfilled' ? results[1].value : null;
     const summary = results[2].status === 'fulfilled' ? results[2].value : null;
     const captchas = results[3].status === 'fulfilled' && Array.isArray(results[3].value) ? results[3].value : [];
+    const agentLog = results[4].status === 'fulfilled' && Array.isArray(results[4].value) ? results[4].value : [];
 
     renderHero(summary, timeline);
     renderTimeline(timeline);
     renderChanges(latestChanges);
     renderCaptchas(captchas);
     renderHeal(timeline);
+    renderAgentLog(agentLog);
 
     $('lastRefresh').textContent = new Date().toLocaleString();
 

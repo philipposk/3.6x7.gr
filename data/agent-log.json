@@ -1,0 +1,30 @@
+[
+  {
+    "ts": "2026-06-08T19:05:00Z",
+    "kind": "improve",
+    "title": "Documentation + site staleness sweep",
+    "detail": "Audited both repos, the READMEs, GitHub descriptions and the live site. Removed a false 'DOM fallback' parsing claim (it's JSON-LD only), deleted dead runner.sh + old launchd plist, rewrote the 3.6x7.gr README to the real tick.js/15-min + hourly-review mechanism with correct data shapes, and documented the captcha-capture env vars + compose mount.",
+    "repo": "smyths-scraper + 3.6x7.gr"
+  },
+  {
+    "ts": "2026-06-08T18:45:00Z",
+    "kind": "improve",
+    "title": "Self-cleaning retention",
+    "detail": "Added artifact retention to tick.js: keep ~72 runs / 60 captcha images, truncate the tick log, and docker image prune — so the repo and disk don't grow without bound.",
+    "repo": "3.6x7.gr"
+  },
+  {
+    "ts": "2026-06-08T18:40:00Z",
+    "kind": "improve",
+    "title": "Captcha capture + gallery",
+    "detail": "Each solve attempt now saves a composite image (legend + photo + the solver's click overlay) and a verdict to a manifest, rendered as a live gallery on the site. First captured puzzle: legend [clock, megaphone, dinosaur], solved on attempt 2.",
+    "repo": "smyths-scraper + 3.6x7.gr"
+  },
+  {
+    "ts": "2026-06-08T18:25:00Z",
+    "kind": "fix",
+    "title": "Tor exit-rotation was a silent no-op in the container",
+    "detail": "The Dockerfile baked a control-port password hash that didn't match the plaintext the app sends, so every NEWNYM rotation failed auth (515) and a flagged exit could never be escaped. Fixed: hash generated at build time, rotateExit() now verifies the 250 OK reply, and the container self-checks auth at boot. Detected from the first failed run, diagnosed, patched, and pushed.",
+    "repo": "smyths-scraper"
+  }
+]
