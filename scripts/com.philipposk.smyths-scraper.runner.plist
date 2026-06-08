@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  com.philipposk.smyths-scraper.runner
+  ============================================================================
+  macOS launchd LaunchAgent that runs the Smyths scraper hourly at minute :07.
+  Minute :07 (not :00) avoids the top-of-hour traffic spike that hits most
+  origins when every cron job in the world fires at once.
+
+  ----------------------------------------------------------------------------
+  Installation
+  ----------------------------------------------------------------------------
+  1. Copy this plist into your user LaunchAgents directory:
+
+       cp scripts/com.philipposk.smyths-scraper.runner.plist ~/Library/LaunchAgents/
+
+  2. Bootstrap (register + load) the agent into your GUI session.
+     RunAtLoad=true means this also fires the runner once, immediately:
+
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.philipposk.smyths-scraper.runner.plist
+
+  3. Force an immediate run on demand (e.g. after editing runner.sh):
+
+       launchctl kickstart -k gui/$(id -u)/com.philipposk.smyths-scraper.runner
+
+  4. Unschedule / unload the agent (stop the hourly job):
+
+       launchctl bootout gui/$(id -u)/com.philipposk.smyths-scraper.runner
+
+  ----------------------------------------------------------------------------
+  Logs
+  ----------------------------------------------------------------------------
+  stdout -> /tmp/smyths-runner.out.log
+  stderr -> /tmp/smyths-runner.err.log
+
+  Tail them with:
+     tail -f /tmp/smyths-runner.out.log /tmp/smyths-runner.err.log
+  ============================================================================
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.philipposk.smyths-scraper.runner</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>/Users/phktistakis/smyths-scraper-site/scripts/runner.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/phktistakis/smyths-scraper-site</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/phktistakis</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Minute</key>
+        <integer>7</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/smyths-runner.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/smyths-runner.err.log</string>
+</dict>
+</plist>

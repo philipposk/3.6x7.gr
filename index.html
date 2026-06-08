@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3.6x7 — Smyths scraper, hourly run</title>
+<meta name="description" content="Live status page for an hourly Smyths Toys product watcher: 40 URLs, change detection, self-healing.">
+<style>
+  :root {
+    --bg: #0c0d10;
+    --bg-card: #14161b;
+    --bg-elev: #1b1e25;
+    --border: #262a33;
+    --fg: #e6e8ee;
+    --fg-dim: #a4a9b6;
+    --muted: #6a7080;
+    --accent: #7aa2f7;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-card: #ffffff;
+    --bg-elev: #f1f1ec;
+    --border: #e3e3dc;
+    --fg: #18181b;
+    --fg-dim: #4a4a52;
+    --muted: #8a8a92;
+    --accent: #2a6df5;
+    --good: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    line-height: 1.55;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+
+  /* Layout */
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 96px; }
+  nav.top {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav.top .inner {
+    max-width: 980px; margin: 0 auto;
+    padding: 10px 24px;
+    display: flex; gap: 18px; align-items: center;
+    overflow-x: auto;
+    font-family: var(--mono); font-size: 13px;
+  }
+  nav.top a { color: var(--fg-dim); white-space: nowrap; }
+  nav.top a:hover { color: var(--fg); text-decoration: none; }
+  nav.top .spacer { flex: 1; }
+  .theme-toggle {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--fg-dim); padding: 4px 10px; border-radius: 6px;
+    font-family: var(--mono); font-size: 12px; cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--fg); border-color: var(--fg-dim); }
+
+  /* Headings */
+  h1, h2, h3 {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+  }
+  h1 { font-size: 32px; line-height: 1.15; }
+  h2 { font-size: 20px; margin-top: 56px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 15px; color: var(--fg-dim); margin-top: 24px; }
+  p { margin: 0 0 12px; color: var(--fg-dim); max-width: 68ch; }
+  p strong { color: var(--fg); font-weight: 600; }
+
+  /* Hero */
+  .hero { padding: 24px 0 8px; }
+  .hero .subtitle { color: var(--fg-dim); margin-top: 4px; font-size: 16px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    padding: 7px 12px; border-radius: 999px;
+    font-family: var(--mono); font-size: 12.5px;
+    color: var(--fg-dim);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.good .dot { background: var(--good); box-shadow: 0 0 8px color-mix(in srgb, var(--good) 60%, transparent); }
+  .pill.warn .dot { background: var(--warn); box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 60%, transparent); }
+  .pill.bad  .dot { background: var(--bad);  box-shadow: 0 0 8px color-mix(in srgb, var(--bad) 60%, transparent); }
+  .pill strong { color: var(--fg); }
+
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin: 20px 0 8px;
+  }
+  .kpi {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .kpi .label { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .kpi .value { font-family: var(--mono); font-size: 26px; color: var(--fg); margin-top: 4px; font-weight: 600; }
+  .kpi .sub { font-size: 12.5px; color: var(--fg-dim); margin-top: 2px; }
+
+  /* Cards / lists */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 12px 0;
+  }
+  ul.flow { list-style: none; padding: 0; margin: 0; }
+  ul.flow li {
+    padding: 10px 0 10px 28px;
+    border-bottom: 1px dashed var(--border);
+    color: var(--fg-dim);
+    position: relative;
+    font-size: 14.5px;
+  }
+  ul.flow li:last-child { border-bottom: none; }
+  ul.flow li::before {
+    content: "→";
+    position: absolute; left: 4px; top: 10px;
+    color: var(--accent); font-family: var(--mono);
+  }
+  ul.flow li code { color: var(--fg); background: var(--bg-elev); padding: 1px 6px; border-radius: 4px; }
+
+  /* Timeline */
+  .timeline { display: flex; flex-direction: column; gap: 6px; }
+  .run-row {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .run-row > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 22px 1fr auto auto auto;
+    gap: 14px; align-items: center;
+  }
+  .run-row > summary::-webkit-details-marker { display: none; }
+  .run-row .status {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--bg); font-weight: 700;
+  }
+  .run-row .status.good { background: var(--good); }
+  .run-row .status.warn { background: var(--warn); }
+  .run-row .status.bad  { background: var(--bad); }
+  .run-row .ts { color: var(--fg); }
+  .run-row .rate { color: var(--fg-dim); }
+  .run-row .rate.good { color: var(--good); }
+  .run-row .rate.bad { color: var(--bad); }
+  .run-row .changes { color: var(--fg-dim); }
+  .run-row .changes strong { color: var(--accent); }
+  .run-row .ago { color: var(--muted); font-size: 12px; }
+  .run-row .details {
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    font-size: 12.5px;
+  }
+  .run-row .details div { color: var(--fg-dim); }
+  .run-row .details div b { color: var(--fg); display: block; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 2px; }
+  .run-row .details .err {
+    grid-column: 1 / -1;
+    background: var(--bg-elev); padding: 10px 12px; border-radius: 6px;
+    color: var(--bad);
+    white-space: pre-wrap; word-break: break-word;
+    font-family: var(--mono); font-size: 12px;
+  }
+
+  /* Changes table */
+  .changes-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .changes-table th, .changes-table td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .changes-table th {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 500;
+    background: var(--bg-elev);
+  }
+  .changes-table td.sku, .changes-table td.field, .changes-table td.before, .changes-table td.after {
+    font-family: var(--mono); font-size: 12.5px;
+  }
+  .changes-table td.before { color: var(--fg-dim); text-decoration: line-through; }
+  .changes-table td.after { color: var(--fg); }
+  .changes-table tr td.after.up   { color: var(--bad); }
+  .changes-table tr td.after.down { color: var(--good); }
+  .arrow { color: var(--muted); margin: 0 4px; }
+  .field-tag {
+    display: inline-block;
+    background: var(--bg-elev);
+    color: var(--fg-dim);
+    padding: 2px 8px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11.5px;
+  }
+
+  /* Issues list */
+  .issues { display: grid; gap: 12px; }
+  .issue {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 12px 14px;
+    font-size: 14px; color: var(--fg-dim);
+  }
+  .issue b { color: var(--fg); font-weight: 600; }
+  .issue .sep { color: var(--muted); margin: 0 6px; }
+
+  /* Links grid */
+  .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .link-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .link-card h4 { margin: 0 0 4px; font-family: var(--mono); font-size: 13px; color: var(--fg); }
+  .link-card p { margin: 0; font-size: 13px; color: var(--fg-dim); }
+  .link-card .badge {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    background: var(--bg-elev); color: var(--muted);
+    padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 64px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: 12px;
+  }
+  footer p { color: var(--muted); margin: 4px 0; }
+
+  /* Empty / loading */
+  .empty {
+    padding: 24px; text-align: center;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+    background: var(--bg-card); border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 20px 16px 64px; }
+    h1 { font-size: 26px; }
+    .kpi-row { grid-template-columns: 1fr; }
+    .run-row > summary { grid-template-columns: 18px 1fr auto; gap: 10px; font-size: 12px; }
+    .run-row .changes, .run-row .ago { display: none; }
+    .changes-table thead { display: none; }
+    .changes-table, .changes-table tbody, .changes-table tr, .changes-table td { display: block; width: 100%; }
+    .changes-table tr {
+      border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 10px; padding: 8px 10px; background: var(--bg-card);
+    }
+    .changes-table td { border: none; padding: 4px 0; }
+    .changes-table td.before, .changes-table td.after { display: inline-block; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="inner">
+    <a href="#hero">overview</a>
+    <a href="#how">how</a>
+    <a href="#timeline">timeline</a>
+    <a href="#changes">changes</a>
+    <a href="#issues">issues</a>
+    <a href="#heal">self-heal</a>
+    <a href="#repos">repos</a>
+    <span class="spacer"></span>
+    <button class="theme-toggle" id="themeToggle" type="button">theme</button>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <section class="hero" id="hero">
+    <h1>Smyths scraper &mdash; hourly run</h1>
+    <p class="subtitle">A Linux container wakes every hour, scrapes 40 Smyths&nbsp;Toys product pages, diffs against the previous run, and commits the results to this repo. This page is rendered from those commits.</p>
+
+    <div class="pills" id="statusPills">
+      <span class="pill"><span class="dot"></span><span>Loading status&hellip;</span></span>
+    </div>
+
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi"><div class="label">Last 24h success rate</div><div class="value" id="kpiRate">&mdash;</div><div class="sub" id="kpiRateSub">&nbsp;</div></div>
+      <div class="kpi"><div class="label">Runs in last 24h</div><div class="value" id="kpiRuns">&mdash;</div><div class="sub" id="kpiRunsSub">&nbsp;</div></div>
+      <div class="kpi"><div class="label">Changes detected (24h)</div><div class="value" id="kpiChanges">&mdash;</div><div class="sub" id="kpiChangesSub">&nbsp;</div></div>
+    </div>
+  </section>
+
+  <section id="what">
+    <h2>What this is</h2>
+    <p>This is a small, single-purpose product watcher. Every hour it pulls the same 40 Smyths Toys product pages, parses each one into structured fields (name, price, availability, image), and compares against the previous run's snapshot.</p>
+    <p>If anything moved &mdash; a price drop, a stockout, a renamed product &mdash; that change shows up in the feed below within an hour of it happening on the live site. If a run fails, the failure itself becomes a row in the timeline, with the stderr tail attached.</p>
+    <p>There is no database and no server. The scraper writes JSON files into this repository; GitHub&nbsp;Pages serves the dashboard; the browser does the rendering. <strong>View source on this page</strong> &mdash; the fetch paths are the data contract.</p>
+  </section>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <ul class="flow">
+      <li>Hourly cron on the maintainer's laptop kicks the Docker container.</li>
+      <li>Container boots: <code>Tor</code> daemon up, <code>Xvfb</code> virtual display up, <code>patchright</code> launches a real headed Chromium.</li>
+      <li>One warm session against the Smyths homepage to clear Imperva's initial challenge and pick up cookies.</li>
+      <li>For each of the 40 product URLs: fetch in-page, extract JSON-LD + DOM fallbacks, normalise to a flat record.</li>
+      <li>If an exit hits an hCaptcha doodle, a free vision-LLM solver (Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia) reads the legend, locates the targets, and clicks in order with human-like jitter.</li>
+      <li>On consecutive failures, send <code>SIGNAL NEWNYM</code> to Tor to rotate the exit circuit, then retry.</li>
+      <li>Diff this run's records against the previous run's snapshot &rarr; write <code>data/latest-changes.json</code>.</li>
+      <li>Append one row to <code>data/timeline.json</code>, refresh <code>data/run-summary.json</code>, commit + push.</li>
+      <li>GitHub Pages picks up the commit; next page load (or the 5-minute auto-refresh) shows the new run.</li>
+    </ul>
+  </section>
+
+  <section id="timeline">
+    <h2>Live timeline</h2>
+    <p>Reverse-chronological. Newest run at top. Click any row to see captcha counts, Tor rotations, duration, and (on failures) the stderr tail.</p>
+    <div id="timelineList" class="timeline">
+      <div class="empty">Loading timeline&hellip;</div>
+    </div>
+  </section>
+
+  <section id="changes">
+    <h2>Last detected changes</h2>
+    <p>Field-level diff from the most recent run. Price moves are coloured <span style="color:var(--good)">down</span> / <span style="color:var(--bad)">up</span>.</p>
+    <div id="changesWrap">
+      <div class="empty">Loading changes&hellip;</div>
+    </div>
+  </section>
+
+  <section id="issues">
+    <h2>Issues we hit + how we solved them</h2>
+    <div class="issues">
+      <div class="issue"><b>Vanilla Playwright + stealth was blocked instantly by Imperva.</b><span class="sep">&rarr;</span>Switched to <code>patchright</code>, a Chromium fork that strips the CDP signals Imperva fingerprints.</div>
+      <div class="issue"><b>Headless mode was detected even with stealth.</b><span class="sep">&rarr;</span>Run a real headed Chrome inside <code>Xvfb</code> (a virtual display) in the container. No pixels rendered to a screen, but Chrome behaves as if there were one.</div>
+      <div class="issue"><b>A single exit IP got rate-limited within a handful of requests.</b><span class="sep">&rarr;</span>Local <code>Tor</code> instance; on consecutive failures the runner sends <code>SIGNAL NEWNYM</code> over the control port to rotate the exit circuit.</div>
+      <div class="issue"><b>hCaptcha doodle puzzles appeared on some exits.</b><span class="sep">&rarr;</span>Free vision-LLM solver chained across Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia. It reads the legend, locates each target doodle, and clicks them in order with small human-like timing jitter.</div>
+      <div class="issue"><b>Retina screenshots came back at 2&times; the page coords, so clicks landed at half-coordinates.</b><span class="sep">&rarr;</span>Pass <code>scale: 'css'</code> to <code>page.screenshot()</code> so the solver and the page share a coordinate system.</div>
+      <div class="issue"><b>Net-zero stall: everything blocked for a full cycle.</b><span class="sep">&rarr;</span>Supervisor escalates to a free-proxy fallback. In this hourly job mode we just let the next cron tick retry &mdash; one bad hour is a row in the timeline, not an incident.</div>
+      <div class="issue"><b>Transient <code>apt-get</code> failure during the Docker build.</b><span class="sep">&rarr;</span>The Dockerfile is idempotent; a plain rerun cleared it. No source change required.</div>
+    </div>
+  </section>
+
+  <section id="heal">
+    <h2>Self-healing</h2>
+    <p>A run is considered failed if the process exits non-zero, lands zero successful product records, or every page comes back blocked. When that happens the runner writes a failure event to <code>timeline.json</code> with the tail of stderr, retries once with a fresh Tor circuit, and (planned) opens a GitHub issue on the scraper repo with the same payload.</p>
+    <p>Code-level self-heal &mdash; the kind where the agent would rewrite a selector because the markup drifted &mdash; is logged for a human to review. Nothing is auto-merged. The point of hourly cadence is that drift is caught within an hour; the point of human review is that the fix is intentional.</p>
+  </section>
+
+  <section id="repos">
+    <h2>Repos &amp; lineage</h2>
+    <div class="links">
+      <div class="link-card">
+        <h4><a href="https://github.com/philipposk/smyths-scraper">philipposk/smyths-scraper</a><span class="badge">private</span></h4>
+        <p>The scraper itself: patchright runner, Tor wiring, vision-LLM captcha solver, Dockerfile, hourly cron unit. Request access from Philippos.</p>
+      </div>
+      <div class="link-card">
+        <h4><a href="https://github.com/philipposk/3.6x7.gr">philipposk/3.6x7.gr</a><span class="badge">public</span></h4>
+        <p>This site. Hourly the scraper commits new JSON files here; GitHub Pages serves them; this page renders them client-side.</p>
+      </div>
+      <div class="link-card">
+        <h4><a href="https://1.6x7.gr">1.6x7.gr</a><span class="badge">previous</span></h4>
+        <p>The one-shot precursor: a single backfill of 58,605 UK Smyths products. This project is the recurring-watcher follow-up, deliberately scoped to 40 URLs to prove robustness + diffing.</p>
+      </div>
+      <div class="link-card">
+        <h4>hydrascrape <span class="badge">downstream</span></h4>
+        <p>The captcha solver here is mirrored into the hydrascrape codebase on Tamas &amp; Amine's side as a drop-in module.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Last data refresh: <span id="lastRefresh" class="mono">&mdash;</span></p>
+    <p>Hourly cron from the maintainer's laptop &mdash; no remote runner. Auto-refreshes this page every 5 minutes.</p>
+    <p>Built by Philippos &mdash; <a href="mailto:phktistakis@gmail.com">phktistakis@gmail.com</a></p>
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  // --- Theme toggle -------------------------------------------------------
+  const themeBtn = document.getElementById('themeToggle');
+  const applyTheme = (t) => {
+    if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  };
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved) applyTheme(saved);
+  } catch (_) {}
+  themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    const next = cur === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    try { localStorage.setItem('theme', next); } catch (_) {}
+  });
+
+  // --- Helpers ------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+
+  const fmtTs = (ts) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const fmtRel = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    const diffMs = Date.now() - d.getTime();
+    const s = Math.round(diffMs / 1000);
+    if (s < 60) return s + 's ago';
+    const m = Math.round(s / 60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.round(m / 60);
+    if (h < 48) return h + 'h ago';
+    const dd = Math.round(h / 24);
+    return dd + 'd ago';
+  };
+
+  const fmtNum = (n, suffix = '') => {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return n.toLocaleString() + suffix;
+  };
+
+  const fmtPct = (n) => {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return (Math.round(n * 10) / 10) + '%';
+  };
+
+  const escapeHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  const statusOf = (entry) => {
+    if (!entry) return 'warn';
+    const s = String(entry.status || '').toLowerCase();
+    if (s === 'ok' || s === 'success' || s === 'good') return 'good';
+    if (s === 'fail' || s === 'failed' || s === 'failure' || s === 'error') return 'bad';
+    if (s === 'partial' || s === 'warn' || s === 'warning' || s === 'degraded') return 'warn';
+    // Fallback by rate
+    const rate = Number(entry.successRatePct);
+    if (!isNaN(rate)) {
+      if (rate >= 95) return 'good';
+      if (rate >= 50) return 'warn';
+      return 'bad';
+    }
+    return 'warn';
+  };
+
+  const statusGlyph = (cls) => cls === 'good' ? '✓' : cls === 'bad' ? '✗' : '!';
+
+  const fetchJson = async (path) => {
+    const r = await fetch(path, { cache: 'no-store' });
+    if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+    return r.json();
+  };
+
+  // --- Renderers ----------------------------------------------------------
+  function renderHero(summary, timeline) {
+    const latest = (timeline && timeline.length) ? timeline[0] : null;
+    const lastTs = (summary && summary.lastRunTs) || (latest && latest.ts) || null;
+    const lastStatus = (summary && summary.lastRunStatus) || (latest && latest.status) || null;
+    const cls = statusOf({ status: lastStatus, successRatePct: latest && latest.successRatePct });
+
+    const pills = $('statusPills');
+    const parts = [];
+
+    const label =
+      cls === 'good' ? 'OK' :
+      cls === 'bad'  ? 'failed' :
+      cls === 'warn' ? 'partial' : 'unknown';
+
+    parts.push(
+      '<span class="pill ' + cls + '"><span class="dot"></span>' +
+      '<span>Last run: <strong>' + escapeHtml(label) + '</strong>' +
+      (lastTs ? ' · ' + escapeHtml(fmtRel(lastTs)) : '') + '</span></span>'
+    );
+
+    if (latest) {
+      const att = Number(latest.attempted) || 40;
+      const ok = Number(latest.success);
+      if (!isNaN(ok)) {
+        parts.push('<span class="pill"><span class="dot"></span><span><strong>' +
+          ok + ' / ' + att + '</strong> products</span></span>');
+      }
+      const ch = Number(latest.changeCount);
+      if (!isNaN(ch)) {
+        parts.push('<span class="pill"><span class="dot"></span><span><strong>' +
+          ch + '</strong> change' + (ch === 1 ? '' : 's') + ' detected</span></span>');
+      }
+    }
+    pills.innerHTML = parts.join('');
+
+    // KPIs
+    if (summary) {
+      $('kpiRate').textContent = fmtPct(summary.last24hSuccessRatePct);
+      $('kpiRateSub').textContent = 'across ' + fmtNum(summary.last24hRuns) + ' runs';
+      $('kpiRuns').textContent = fmtNum(summary.last24hRuns);
+      $('kpiRunsSub').textContent = 'total: ' + fmtNum(summary.totalRuns);
+      $('kpiChanges').textContent = fmtNum(summary.last24hChangeCount);
+      $('kpiChangesSub').textContent = lastTs ? 'last run ' + fmtRel(lastTs) : '';
+    } else if (latest) {
+      $('kpiRate').textContent = fmtPct(latest.successRatePct);
+      $('kpiRateSub').textContent = 'latest run only';
+      $('kpiChanges').textContent = fmtNum(latest.changeCount);
+    }
+  }
+
+  function renderTimeline(timeline) {
+    const wrap = $('timelineList');
+    if (!timeline || !timeline.length) {
+      wrap.innerHTML = '<div class="empty">First run pending &mdash; should appear within the hour.</div>';
+      return;
+    }
+    // Newest first
+    const rows = timeline.slice().sort((a, b) =>
+      new Date(b.ts).getTime() - new Date(a.ts).getTime()
+    );
+
+    wrap.innerHTML = rows.map((r) => {
+      const cls = statusOf(r);
+      const glyph = statusGlyph(cls);
+      const att = Number(r.attempted) || 40;
+      const ok = Number(r.success);
+      const rate = Number(r.successRatePct);
+      const rateCls = !isNaN(rate) ? (rate >= 95 ? 'good' : rate < 50 ? 'bad' : '') : '';
+      const ch = Number(r.changeCount);
+      const dur = Number(r.durationSec);
+      const cap = Number(r.captchas);
+      const tor = Number(r.torRotations);
+
+      const details = [];
+      details.push('<div><b>Attempted</b>' + att + '</div>');
+      if (!isNaN(ok))    details.push('<div><b>Succeeded</b>' + ok + '</div>');
+      if (!isNaN(rate))  details.push('<div><b>Success rate</b>' + fmtPct(rate) + '</div>');
+      if (!isNaN(ch))    details.push('<div><b>Changes</b>' + ch + '</div>');
+      if (!isNaN(cap))   details.push('<div><b>Captchas solved</b>' + cap + '</div>');
+      if (!isNaN(tor))   details.push('<div><b>Tor rotations</b>' + tor + '</div>');
+      if (!isNaN(dur))   details.push('<div><b>Duration</b>' + dur + 's</div>');
+      if (r.error) details.push('<div class="err">' + escapeHtml(r.error) + '</div>');
+
+      return '' +
+        '<details class="run-row">' +
+          '<summary>' +
+            '<span class="status ' + cls + '" title="' + cls + '">' + glyph + '</span>' +
+            '<span class="ts">' + escapeHtml(fmtTs(r.ts)) + '</span>' +
+            '<span class="rate ' + rateCls + '">' +
+              (!isNaN(rate) ? fmtPct(rate) : '—') +
+              (!isNaN(ok) ? ' (' + ok + '/' + att + ')' : '') +
+            '</span>' +
+            '<span class="changes">' +
+              (!isNaN(ch) ? '<strong>' + ch + '</strong> change' + (ch === 1 ? '' : 's') : '—') +
+            '</span>' +
+            '<span class="ago">' + escapeHtml(fmtRel(r.ts)) + '</span>' +
+          '</summary>' +
+          '<div class="details">' + details.join('') + '</div>' +
+        '</details>';
+    }).join('');
+  }
+
+  function smyhsUrlFor(c) {
+    if (c.url) return c.url;
+    if (c.sku) return 'https://www.smythstoys.com/uk/en-gb/search?text=' + encodeURIComponent(c.sku);
+    return null;
+  }
+
+  function priceDirection(before, after) {
+    const b = parseFloat(String(before).replace(/[^0-9.\-]/g, ''));
+    const a = parseFloat(String(after).replace(/[^0-9.\-]/g, ''));
+    if (isNaN(b) || isNaN(a)) return '';
+    if (a > b) return 'up';
+    if (a < b) return 'down';
+    return '';
+  }
+
+  function renderChanges(payload) {
+    const wrap = $('changesWrap');
+    const changes = payload && Array.isArray(payload.changes) ? payload.changes : [];
+    if (!changes.length) {
+      wrap.innerHTML = '<div class="empty">No drift detected in the last run. Catalog is stable.</div>';
+      return;
+    }
+    const ts = payload && payload.ts;
+    const header = ts
+      ? '<p style="margin-top:0;color:var(--muted);font-family:var(--mono);font-size:12.5px">from run at ' + escapeHtml(fmtTs(ts)) + '</p>'
+      : '';
+
+    const rows = changes.map((c) => {
+      const url = smyhsUrlFor(c);
+      const nameCell = url
+        ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(c.name || c.sku || '—') + '</a>'
+        : escapeHtml(c.name || c.sku || '—');
+      const field = String(c.field || '').toLowerCase();
+      const isPrice = field === 'price';
+      const dir = isPrice ? priceDirection(c.before, c.after) : '';
+      const dirGlyph = dir === 'up' ? ' ↑' : dir === 'down' ? ' ↓' : '';
+
+      return '<tr>' +
+        '<td class="sku">' + escapeHtml(c.sku || '—') + '</td>' +
+        '<td>' + nameCell + '</td>' +
+        '<td class="field"><span class="field-tag">' + escapeHtml(c.field || '—') + '</span></td>' +
+        '<td class="before">' + escapeHtml(c.before == null ? '—' : c.before) + '</td>' +
+        '<td class="after ' + dir + '">' + escapeHtml(c.after == null ? '—' : c.after) + dirGlyph + '</td>' +
+      '</tr>';
+    }).join('');
+
+    wrap.innerHTML = header +
+      '<table class="changes-table">' +
+        '<thead><tr><th>SKU</th><th>Name</th><th>Field</th><th>Before</th><th>After</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+  }
+
+  // --- Load + refresh -----------------------------------------------------
+  async function loadAll() {
+    const results = await Promise.allSettled([
+      fetchJson('data/timeline.json'),
+      fetchJson('data/latest-changes.json'),
+      fetchJson('data/run-summary.json'),
+    ]);
+
+    const timeline = results[0].status === 'fulfilled' && Array.isArray(results[0].value) ? results[0].value : [];
+    const latestChanges = results[1].status === 'fulfilled' ? results[1].value : null;
+    const summary = results[2].status === 'fulfilled' ? results[2].value : null;
+
+    renderHero(summary, timeline);
+    renderTimeline(timeline);
+    renderChanges(latestChanges);
+
+    $('lastRefresh').textContent = new Date().toLocaleString();
+
+    if (!timeline.length && results[0].status === 'rejected') {
+      $('statusPills').innerHTML =
+        '<span class="pill warn"><span class="dot"></span><span>First run pending &mdash; <strong>no timeline.json yet</strong></span></span>';
+    }
+  }
+
+  loadAll().catch((e) => {
+    console.error(e);
+    $('statusPills').innerHTML =
+      '<span class="pill bad"><span class="dot"></span><span>Failed to load data: ' + escapeHtml(e.message) + '</span></span>';
+  });
+
+  setInterval(() => { loadAll().catch((e) => console.error(e)); }, REFRESH_MS);
+})();
+</script>
+
+</body>
+</html>
