@@ -1,5 +1,12 @@
 [
   {
+    "ts": "2026-06-08T20:24:58Z",
+    "kind": "improve",
+    "title": "Dashboard shows when the next run is due",
+    "detail": "Added a \"next run ~HH:MM (in ~Xm)\" indicator to the header so it is clear scrapes are hourly and not stalled — addresses the most common point of confusion when watching the timeline between runs.",
+    "repo": "3.6x7.gr"
+  },
+  {
     "ts": "2026-06-08T19:25:00Z",
     "kind": "improve",
     "title": "Separated resilience from self-healing; added an integration section",

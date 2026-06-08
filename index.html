@@ -651,6 +651,18 @@
           ch + '</strong> change' + (ch === 1 ? '' : 's') + ' detected</span></span>');
       }
     }
+
+    // Next run: scrapes are hourly, kicked at the next 15-min tick once the last run is >60 min old.
+    if (lastTs) {
+      const due = parseTs(lastTs).getTime() + 60 * 60 * 1000;
+      if (!isNaN(due)) {
+        const mins = Math.round((due - Date.now()) / 60000);
+        const when = new Date(due).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        const txt = mins > 1 ? 'next run ~' + when + ' (in ~' + mins + 'm)'
+          : mins >= -15 ? 'next run due now' : 'next run overdue';
+        parts.push('<span class="pill"><span class="dot"></span><span>' + escapeHtml(txt) + '</span></span>');
+      }
+    }
     pills.innerHTML = parts.join('');
 
     // KPIs
