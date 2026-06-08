@@ -348,17 +348,17 @@
   <section id="what">
     <h2>What this is</h2>
     <p>This is a small, single-purpose product watcher. Every hour it pulls the same 40 Smyths Toys product pages, parses each one into structured fields (name, price, availability, image), and compares against the previous run's snapshot.</p>
-    <p>If anything moved &mdash; a price drop, a stockout, a renamed product &mdash; that change shows up in the feed below within an hour of it happening on the live site. If a run fails, the failure itself becomes a row in the timeline, with the stderr tail attached.</p>
+    <p>If anything moved &mdash; a price drop, a stockout, a renamed product &mdash; that change shows up in the feed below within an hour of it happening on the live site. When a page throws an hCaptcha, the free vision solver clears it and the puzzle is saved to the <a href="#captchas">captcha gallery</a> with its verdict. If a run fails, the failure itself becomes a row in the timeline, with the stderr tail attached.</p>
     <p>There is no database and no server. The scraper writes JSON files into this repository; GitHub&nbsp;Pages serves the dashboard; the browser does the rendering. <strong>View source on this page</strong> &mdash; the fetch paths are the data contract.</p>
   </section>
 
   <section id="how">
     <h2>How it works</h2>
     <ul class="flow">
-      <li>A cron tick every 15&nbsp;min kicks the Docker container once an hour and ingests results in between; a Claude Code agent reviews health and repairs code on failure.</li>
+      <li>A 15-minute cron tick (<code>tick.js</code>) orchestrates: it ingests finished runs, diffs them, updates this page, and launches a fresh scrape container once an hour when one is due; a Claude Code agent reviews health separately and repairs code on failure.</li>
       <li>Container boots: <code>Tor</code> daemon up, <code>Xvfb</code> virtual display up, then a <b>self-check</b> verifies Tor control auth + <code>NEWNYM</code> works (refuses to start if not), then <code>patchright</code> launches a real headed Chrome.</li>
       <li>One warm session against the Smyths homepage to clear Imperva's initial challenge and pick up cookies.</li>
-      <li>For each of the 40 product URLs: fetch in-page, extract JSON-LD + DOM fallbacks, normalise to a flat record.</li>
+      <li>For each of the 40 product URLs: fetch in-page (reusing the cleared challenge cookie), parse the page's JSON-LD structured data (schema.org Product + BreadcrumbList), normalise to a flat record.</li>
       <li>If an exit hits an hCaptcha doodle, a free vision-LLM solver (Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia) reads the legend, locates the targets, and clicks in order with human-like jitter.</li>
       <li>On consecutive failures, send <code>SIGNAL NEWNYM</code> to Tor to rotate the exit circuit, then retry.</li>
       <li>Diff this run's records against the previous run's snapshot &rarr; write <code>data/latest-changes.json</code>.</li>
@@ -457,7 +457,7 @@
 
   <footer>
     <p>Last data refresh: <span id="lastRefresh" class="mono">&mdash;</span></p>
-    <p>Hourly cron from the maintainer's laptop &mdash; no remote runner. Auto-refreshes this page every 5 minutes.</p>
+    <p>Orchestrated by a 15-minute tick (<code>tick.js</code>) for ingestion + scheduling, plus a Claude Code agent for health monitoring + auto-repair &mdash; both on the maintainer's laptop, no remote runners. Auto-refreshes this page every 5 minutes.</p>
     <p>Built by Philippos &mdash; <a href="mailto:phktistakis@gmail.com">phktistakis@gmail.com</a></p>
   </footer>
 
