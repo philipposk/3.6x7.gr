@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  smyths-tick — runs scripts/tick.js every 15 minutes (zero LLM tokens).
+  tick.js: ingest finished runs → diff → timeline → commit+push, kick the hourly scrape
+  when due, kill stuck containers, prune old artifacts. A Claude Code agent reviews health
+  ~hourly on top of this and patches code if a run fails for a new reason.
+
+  Install:
+    cp scripts/com.philipposk.smyths-tick.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.philipposk.smyths-tick.plist
+    launchctl kickstart -k gui/$(id -u)/com.philipposk.smyths-tick      # run once now
+  Inspect:
+    launchctl print gui/$(id -u)/com.philipposk.smyths-tick | head -40
+    tail -f ~/smyths-scraper-site/logs/cron.log
+  Stop / unschedule:
+    launchctl bootout gui/$(id -u)/com.philipposk.smyths-tick
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.philipposk.smyths-tick</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>NODE=$(command -v node || echo /opt/homebrew/bin/node); "$NODE" /Users/phktistakis/smyths-scraper-site/scripts/tick.js >> /Users/phktistakis/smyths-scraper-site/logs/cron.log 2>&1</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/phktistakis/smyths-scraper-site</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/phktistakis</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/smyths-tick.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/smyths-tick.err.log</string>
+</dict>
+</plist>

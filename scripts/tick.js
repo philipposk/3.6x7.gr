@@ -128,8 +128,9 @@ function kickIfDue() {
   const envFlag = fs.existsSync(ENV_FILE) ? `--env-file ${ENV_FILE}` : '';
   const CAPTCHAS = path.join(DATA, 'captchas');
   fs.mkdirSync(CAPTCHAS, { recursive: true });
+  // Solver flags (SOLVE_FREE_ONLY, SOLVE_PAID_FALLBACK, etc.) come from secrets/.env so
+  // there's ONE place to flip free<->paid. Only per-run things are passed via -e here.
   const cmd = `docker run -d --rm --platform linux/amd64 --name ${name} ${envFlag} ` +
-    `-e SOLVE_ENABLED=1 -e SOLVE_FREE_ONLY=0 -e ROTATE_ON_FAILS=2 -e MAX_PER_RUN=${MAX_PER_RUN} ` +
     `-e CAPTCHA_DUMP_DIR=/captchas -e CAPTURE_RUN_TAG=${tag} ` +
     `-v ${URLS}:/app/urls.txt:ro -v ${RUNS}:/out -v ${REPORTS}:/reports -v ${CAPTCHAS}:/captchas ` +
     `${IMAGE} run -i /app/urls.txt -o /out/${tag}.ndjson -r /reports/${tag}.json -s factory`;

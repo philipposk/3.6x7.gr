@@ -355,7 +355,7 @@
   <section id="how">
     <h2>How it works</h2>
     <ul class="flow">
-      <li>An hourly tick on the maintainer's laptop kicks the Docker container (a monitor also runs every ~4.5&nbsp;min to ingest results, push, and catch stuck/failed runs).</li>
+      <li>A cron tick every 15&nbsp;min kicks the Docker container once an hour and ingests results in between; a Claude Code agent reviews health and repairs code on failure.</li>
       <li>Container boots: <code>Tor</code> daemon up, <code>Xvfb</code> virtual display up, then a <b>self-check</b> verifies Tor control auth + <code>NEWNYM</code> works (refuses to start if not), then <code>patchright</code> launches a real headed Chrome.</li>
       <li>One warm session against the Smyths homepage to clear Imperva's initial challenge and pick up cookies.</li>
       <li>For each of the 40 product URLs: fetch in-page, extract JSON-LD + DOM fallbacks, normalise to a flat record.</li>
@@ -421,10 +421,10 @@
         </ul>
       </div>
       <div class="heal-card good-border">
-        <h4>Agent loop, every 4.5&nbsp;min</h4>
+        <h4>Monitor + agent repair</h4>
         <ul>
-          <li>A <b>Claude Code agent</b> wakes on a 4.5-minute loop and checks everything: ingests finished runs, diffs them, updates this site, kicks the hourly scrape when due, and kills stuck containers.</li>
-          <li>If a run <b>fails for a new reason</b> (e.g. the Tor-515 bug, or Smyths changing their markup), the agent diagnoses the cause from the logs, <b>patches the scraper code, rebuilds the Docker image, and pushes the fix</b> to the <a href="https://github.com/philipposk/smyths-scraper">smyths-scraper</a> repo &mdash; then the next run picks it up.</li>
+          <li>A <b>cron tick runs every 15&nbsp;minutes</b> (zero LLM cost): it ingests finished runs, diffs them, updates this site, kicks the hourly scrape when due, kills stuck containers, and prunes old artifacts.</li>
+          <li>On top of that a <b>Claude Code agent reviews health</b> and, when a run <b>fails for a new reason</b> (e.g. the Tor-515 bug, or Smyths changing their markup), it diagnoses the cause from the logs, <b>patches the scraper code, rebuilds the Docker image, and pushes the fix</b> to the <a href="https://github.com/philipposk/smyths-scraper">smyths-scraper</a> repo &mdash; the next run picks it up.</li>
           <li>The Tor-515 fix below was done exactly this way: detected, diagnosed, patched, pushed. Every code change lands as a normal commit you can review.</li>
         </ul>
       </div>
