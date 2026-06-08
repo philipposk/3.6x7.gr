@@ -159,6 +159,56 @@ function killStuck() {
   }
 }
 
+// ---- 3b. CLEANUP: retention so the repo + disk don't grow forever ----------
+const KEEP_RUNS = parseInt(process.env.KEEP_RUNS || '72', 10);     // ~3 days at hourly
+const KEEP_CAPTCHAS = parseInt(process.env.KEEP_CAPTCHAS || '60', 10);
+const CHANGES = path.join(DATA, 'changes');
+const CAPTCHAS = path.join(DATA, 'captchas');
+
+function pruneByTag(dir, suffix, keep) {
+  if (!fs.existsSync(dir)) return 0;
+  const tags = fs.readdirSync(dir).filter((f) => f.endsWith(suffix)).map((f) => f.replace(suffix, '')).sort();
+  const drop = tags.slice(0, Math.max(0, tags.length - keep));
+  for (const t of drop) { try { fs.unlinkSync(path.join(dir, t + suffix)); } catch {} }
+  return drop.length;
+}
+
+function cleanup() {
+  // Keep the most recent KEEP_RUNS of each artifact; older ones are removed from the
+  // working tree (git history still holds them — fine for a demo, not unbounded on disk).
+  let removed = 0;
+  removed += pruneByTag(RUNS, '.ndjson', KEEP_RUNS);
+  removed += pruneByTag(REPORTS, '.json', KEEP_RUNS);
+  removed += pruneByTag(CHANGES, '.json', KEEP_RUNS);
+  // Captcha images: prune to KEEP_CAPTCHAS using the manifest as the source of truth.
+  try {
+    const mp = path.join(CAPTCHAS, 'captchas.json');
+    if (fs.existsSync(mp)) {
+      let m = JSON.parse(fs.readFileSync(mp, 'utf8'));
+      if (Array.isArray(m) && m.length > KEEP_CAPTCHAS) {
+        for (const d of m.slice(KEEP_CAPTCHAS)) { try { if (d.image) fs.unlinkSync(path.join(CAPTCHAS, d.image)); } catch {} }
+        m = m.slice(0, KEEP_CAPTCHAS);
+        fs.writeFileSync(mp, JSON.stringify(m, null, 2));
+        removed++;
+      }
+      // Drop orphan images not referenced by the manifest.
+      const refset = new Set(m.map((x) => x.image));
+      for (const f of fs.readdirSync(CAPTCHAS)) {
+        if (f.endsWith('.png') && !refset.has(f)) { try { fs.unlinkSync(path.join(CAPTCHAS, f)); removed++; } catch {} }
+      }
+    }
+  } catch {}
+  // Truncate the tick log if it grows past ~2MB (keep the tail).
+  try { if (fs.existsSync(LOG) && fs.statSync(LOG).size > 2 * 1024 * 1024) {
+    const tail = fs.readFileSync(LOG, 'utf8').split('\n').slice(-2000).join('\n');
+    fs.writeFileSync(LOG, tail);
+  } } catch {}
+  // Remove dangling docker images left by rebuilds (safe — only untagged layers).
+  shSafe('docker image prune -f');
+  if (removed) log(`cleanup: pruned ${removed} stale artifact(s) (keep runs=${KEEP_RUNS}, captchas=${KEEP_CAPTCHAS})`);
+  return removed;
+}
+
 // ---- 4. PUSH if dirty ------------------------------------------------------
 function pushIfDirty() {
   const st = shSafe('git status --porcelain data/', { cwd: ROOT });
@@ -180,6 +230,7 @@ function main() {
   const n = ingest();
   if (n) log(`ingested ${n} new run(s)`);
   const kicked = kickIfDue();
+  cleanup();
   pushIfDirty();
   const running = runningContainers();
   log(`=== tick end (ingested=${n} kicked=${kicked || 'no'} running=${running.length}) ===`);

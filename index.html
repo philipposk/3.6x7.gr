@@ -409,23 +409,23 @@
 
   <section id="heal">
     <h2>Self-healing</h2>
-    <p>Being precise about what's automatic vs. what's a human, because it matters:</p>
+    <p>Two layers: fast automatic recovery inside each run, and an agent loop that monitors and repairs the code itself.</p>
     <div class="heal-cols">
       <div class="heal-card good-border">
-        <h4>Automatic (every run, no human)</h4>
+        <h4>In-run, automatic</h4>
         <ul>
           <li><b>Tor exit rotation</b> &mdash; on consecutive failures or a flagged exit, <code>SIGNAL NEWNYM</code> picks a fresh circuit.</li>
           <li><b>Vision-provider rotation</b> &mdash; on rate-limit/5xx the solver falls through Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia.</li>
           <li><b>Boot self-check</b> &mdash; the container refuses to start if Tor control auth is broken (the exact bug that caused the first failed run).</li>
-          <li><b>Stuck-run kill</b> &mdash; a monitor tick kills any scrape running past 20&nbsp;min and logs it as a failed run.</li>
           <li><b>Failure &rarr; timeline</b> &mdash; a non-zero exit, zero successes, or all-blocked becomes a timeline row with the stderr tail + a classified cause.</li>
         </ul>
       </div>
-      <div class="heal-card">
-        <h4>Human-in-the-loop (honest)</h4>
+      <div class="heal-card good-border">
+        <h4>Agent loop, every 4.5&nbsp;min</h4>
         <ul>
-          <li><b>Code fixes</b> &mdash; when a run fails for a <em>new</em> reason (e.g. the Tor-515 bug, or Smyths changing markup), the cause is diagnosed, the code is patched, the image rebuilt, and the fix pushed to the scraper repo. The system does <em>not</em> rewrite its own code unattended.</li>
-          <li><b>Why not auto-merge?</b> Hourly cadence means drift is caught within an hour; human review means the fix is intentional, not a guess that compounds.</li>
+          <li>A <b>Claude Code agent</b> wakes on a 4.5-minute loop and checks everything: ingests finished runs, diffs them, updates this site, kicks the hourly scrape when due, and kills stuck containers.</li>
+          <li>If a run <b>fails for a new reason</b> (e.g. the Tor-515 bug, or Smyths changing their markup), the agent diagnoses the cause from the logs, <b>patches the scraper code, rebuilds the Docker image, and pushes the fix</b> to the <a href="https://github.com/philipposk/smyths-scraper">smyths-scraper</a> repo &mdash; then the next run picks it up.</li>
+          <li>The Tor-515 fix below was done exactly this way: detected, diagnosed, patched, pushed. Every code change lands as a normal commit you can review.</li>
         </ul>
       </div>
     </div>
