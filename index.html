@@ -258,6 +258,18 @@
   .heal-card ul { margin: 0; padding-left: 18px; }
   .heal-card li { font-size: 13px; color: var(--fg-dim); margin: 5px 0; }
   .heal-card li b { color: var(--fg); }
+  .card-note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); font-style: italic; }
+  .runs-where { margin: 14px 0 0; font-size: 13px; color: var(--fg-dim); }
+  .runs-where b { color: var(--fg); }
+
+  /* Integration table + flag list */
+  .plug-table { width: 100%; border-collapse: collapse; margin: 4px 0 14px; font-size: 13.5px; }
+  .plug-table th { text-align: left; font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .plug-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--fg-dim); vertical-align: top; }
+  .plug-table td:first-child { color: var(--fg); white-space: nowrap; font-weight: 600; }
+  .flag-list { margin: 4px 0 14px; padding-left: 18px; }
+  .flag-list li { font-size: 13px; color: var(--fg-dim); margin: 5px 0; }
+  .flag-list code, .plug-table code { color: var(--fg); background: var(--bg-elev); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   .heal-event {
     background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--bad);
     border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 13px; color: var(--fg-dim);
@@ -335,8 +347,9 @@
     <a href="#changes">changes</a>
     <a href="#captchas">captchas</a>
     <a href="#issues">issues</a>
-    <a href="#heal">self-heal</a>
+    <a href="#heal">reliability</a>
     <a href="#agent">agent</a>
+    <a href="#integration">integration</a>
     <a href="#repos">repos</a>
     <span class="spacer"></span>
     <button class="theme-toggle" id="themeToggle" type="button">theme</button>
@@ -362,9 +375,9 @@
 
   <section id="what">
     <h2>What this is</h2>
-    <p>This is a small, single-purpose product watcher. Every hour it pulls the same 40 Smyths Toys product pages, parses each one into structured fields (name, price, availability, image), and compares against the previous run's snapshot.</p>
-    <p>If anything moved &mdash; a price drop, a stockout, a renamed product &mdash; that change shows up in the feed below within an hour of it happening on the live site. When a page throws an hCaptcha, the free vision solver clears it and the puzzle is saved to the <a href="#captchas">captcha gallery</a> with its verdict. If a run fails, the failure itself becomes a row in the timeline, with the stderr tail attached.</p>
-    <p>There is no database and no server. The scraper writes JSON files into this repository; GitHub&nbsp;Pages serves the dashboard; the browser does the rendering. <strong>View source on this page</strong> &mdash; the fetch paths are the data contract.</p>
+    <p>A single-purpose product watcher. Every hour it pulls the same 40 Smyths Toys product pages, parses each into structured fields (name, price, availability, image, category), and compares the result against the previous run.</p>
+    <p>Anything that moved — a price change, a stockout, a rename — shows up in the changes feed. Pages that throw an hCaptcha are solved by a free vision model and the puzzle is saved with its verdict. A run that fails becomes a row in the timeline with the error tail attached.</p>
+    <p>No database, no server: the scraper commits JSON files to this repo, GitHub Pages serves them, and the browser renders them.</p>
   </section>
 
   <section id="how">
@@ -392,8 +405,7 @@
 
   <section id="changes">
     <h2>Last detected changes</h2>
-    <p>Field-level diff from the most recent run. Price moves are coloured <span style="color:var(--good)">down</span> / <span style="color:var(--bad)">up</span>.</p>
-    <p class="note-box"><strong>Compared against what?</strong> Each run is diffed against the <em>immediately previous run's snapshot</em> &mdash; the product records stored in this repo at <code>data/runs/&lt;previous-timestamp&gt;.ndjson</code>. Matching is by product SKU. The very first run has nothing to compare against, so every product counts as <em>new</em>; from the second run onward you see only what actually moved (price, in-stock, name, image, category). <span id="changesCompareLine"></span></p>
+    <p>Field-level diff against the previous run's snapshot (<code>data/runs/&lt;prev&gt;.ndjson</code>), matched by SKU. The first run has nothing to compare to, so everything is new; after that, only what actually moved — price, stock, name, image, category — appears here. Price moves are coloured <span style="color:var(--good)">down</span> / <span style="color:var(--bad)">up</span>. <span id="changesCompareLine"></span></p>
     <div id="changesWrap">
       <div class="empty">Loading changes&hellip;</div>
     </div>
@@ -401,7 +413,7 @@
 
   <section id="captchas">
     <h2>Captchas the solver saw</h2>
-    <p>When a Tor exit gets challenged, Smyths shows an hCaptcha &ldquo;select in order&rdquo; doodle puzzle. The free vision-LLM solver reads the legend, locates each target, and clicks in order. Below is what it actually faced this run &mdash; the coloured rings are where the solver clicked &mdash; with the verdict. <span id="captchaRate" class="mono"></span></p>
+    <p>A challenged Tor exit gets an hCaptcha &ldquo;select in order&rdquo; doodle puzzle. The vision model reads the legend, locates each target, and clicks them in order. The coloured rings below mark where it clicked; the verdict says whether it cleared. <span id="captchaRate" class="mono"></span></p>
     <div id="captchaWrap" class="captcha-grid">
       <div class="empty">Loading captchas&hellip;</div>
     </div>
@@ -409,49 +421,72 @@
 
   <section id="issues">
     <h2>Issues we hit + how we solved them</h2>
-    <p class="note-box">Real problems from building + running this, newest first. The Tor-rotation bug below was found and fixed <em>on this very deployment</em> &mdash; the failed run on the timeline is it.</p>
     <div class="issues">
-      <div class="issue"><b>In the container, Tor exit rotation silently did nothing &mdash; the first container run got stuck on a flagged exit and failed.</b><span class="sep">&rarr;</span>The Dockerfile had baked a control-port password <em>hash</em> that didn't match the plaintext the app sends (<code>tor --hash-password</code> uses a random salt each call). Every <code>SIGNAL NEWNYM</code> failed auth (<code>515</code>), so the scraper could never leave a bad exit. Three-part fix: the hash is now generated <em>at build time</em> from the real password so it always matches; <code>rotateExit()</code> now parses Tor's reply and only reports success on a real <code>250 OK</code> (it used to report success even on auth failure); and the container runs a <em>boot-time self-check</em> that refuses to start if rotation auth is broken.</div>
-      <div class="issue"><b>Free vision providers (Gemini, Groq) returned <code>503</code>/<code>429</code> under load, so the captcha solver couldn't read the puzzle.</b><span class="sep">&rarr;</span>Providers are chained (Gemini&nbsp;native &rarr; Gemini &rarr; OpenRouter Qwen3-VL &rarr; Groq &rarr; Nvidia) and rotate on rate-limit/5xx. When all free tiers are saturated, the lane rotates the Tor exit instead &mdash; a fresh exit often isn't challenged at all. Transient overload is recovered from, not a code bug.</div>
-      <div class="issue"><b>Vanilla Playwright + stealth was blocked instantly by Imperva.</b><span class="sep">&rarr;</span>Switched to <code>patchright</code>, a Chromium fork that strips the CDP automation signals Imperva fingerprints.</div>
-      <div class="issue"><b>Headless mode was detected even with stealth.</b><span class="sep">&rarr;</span>Run a real headed Chrome inside <code>Xvfb</code> (a virtual display) in the container. Nothing is drawn to a physical screen, but Chrome behaves as if it had one &mdash; this is exactly what lets it run in a Linux container with no GUI.</div>
-      <div class="issue"><b>A single exit IP got rate-limited within a handful of requests.</b><span class="sep">&rarr;</span>Local <code>Tor</code> instance; on consecutive failures the runner sends <code>SIGNAL NEWNYM</code> over the control port to rotate the exit circuit (free, instant).</div>
-      <div class="issue"><b>hCaptcha doodle puzzles appeared on some exits.</b><span class="sep">&rarr;</span>Free vision-LLM solver reads the legend, locates each target doodle as normalised 0&ndash;1000 coordinates, and clicks them in order with human-like timing jitter. See the gallery above for live examples + verdicts.</div>
-      <div class="issue"><b>Retina screenshots came back at 2&times; the page coords, so clicks landed at half-coordinates.</b><span class="sep">&rarr;</span>Pass <code>scale: 'css'</code> to <code>page.screenshot()</code> so the solver and the page share one coordinate system.</div>
-      <div class="issue"><b>Transient <code>apt-get</code> failure during the Docker build (mirror hiccup).</b><span class="sep">&rarr;</span>The Dockerfile is idempotent; a plain rerun cleared it. No source change required.</div>
+      <div class="issue"><b>Tor exit rotation was a silent no-op in the container.</b><span class="sep">&rarr;</span>The Dockerfile baked a control-port password hash that didn't match the plaintext the app sends (<code>tor --hash-password</code> salts randomly), so every <code>SIGNAL NEWNYM</code> failed auth (<code>515</code>) and a flagged exit could never be left. Fixed three ways: the hash is generated at build time so it always matches, <code>rotateExit()</code> now checks for a real <code>250 OK</code> instead of assuming success, and the container verifies rotation auth at boot and refuses to start otherwise.</div>
+      <div class="issue"><b>Free vision providers returned <code>503</code>/<code>429</code> under load.</b><span class="sep">&rarr;</span>The solver chains Gemini, OpenRouter Qwen3-VL, Groq and Nvidia and rotates on rate-limit or 5xx. If every free tier is saturated, the lane rotates the Tor exit instead — a fresh exit is often not challenged at all.</div>
+      <div class="issue"><b>Vanilla Playwright was blocked instantly by Imperva.</b><span class="sep">&rarr;</span><code>patchright</code> (a Chromium fork) strips the CDP automation signals Imperva fingerprints.</div>
+      <div class="issue"><b>Headless Chrome was detected even with stealth.</b><span class="sep">&rarr;</span>Run real headed Chrome inside <code>Xvfb</code>, a virtual display. Nothing reaches a physical screen, which is what lets it run in a container with no GUI.</div>
+      <div class="issue"><b>A single IP was rate-limited within a few requests.</b><span class="sep">&rarr;</span>A local Tor instance rotates the exit circuit with <code>SIGNAL NEWNYM</code> on consecutive failures.</div>
+      <div class="issue"><b>Retina screenshots came back at 2&times; page coordinates, so clicks landed at half-position.</b><span class="sep">&rarr;</span><code>page.screenshot({ scale: 'css' })</code> puts the solver and the page on one coordinate system.</div>
+      <div class="issue"><b>A Docker build failed on a transient <code>apt-get</code> mirror error.</b><span class="sep">&rarr;</span>The Dockerfile is idempotent; rerunning cleared it.</div>
     </div>
   </section>
 
   <section id="heal">
-    <h2>Self-healing</h2>
-    <p>Two layers: fast automatic recovery inside each run, and an agent loop that monitors and repairs the code itself.</p>
+    <h2>Reliability</h2>
+    <p>Two distinct things. Resilience is how a single run keeps itself going; it runs inside the container. Self-healing is what happens around the runs — recovery and code repair — and lives on the host, not in the container.</p>
     <div class="heal-cols">
-      <div class="heal-card good-border">
-        <h4>In-run, automatic</h4>
+      <div class="heal-card">
+        <h4>Resilience &mdash; inside each run (in the container)</h4>
         <ul>
-          <li><b>Tor exit rotation</b> &mdash; on consecutive failures or a flagged exit, <code>SIGNAL NEWNYM</code> picks a fresh circuit.</li>
-          <li><b>Vision-provider rotation</b> &mdash; on rate-limit/5xx the solver falls through Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia.</li>
-          <li><b>Boot self-check</b> &mdash; the container refuses to start if Tor control auth is broken (the exact bug that caused the first failed run).</li>
-          <li><b>Failure &rarr; timeline</b> &mdash; a non-zero exit, zero successes, or all-blocked becomes a timeline row with the stderr tail + a classified cause.</li>
+          <li>Tor exit rotation: <code>SIGNAL NEWNYM</code> on consecutive failures or a flagged exit.</li>
+          <li>Vision-provider rotation across Gemini, OpenRouter, Groq and Nvidia on rate-limit or 5xx.</li>
+          <li>Randomised pacing with the odd longer pause, and a retry on a refreshed session.</li>
+          <li>A boot check that aborts the run if Tor control auth is misconfigured.</li>
         </ul>
+        <p class="card-note">This is ordinary fault tolerance, not healing &mdash; it just gets one scrape finished.</p>
       </div>
       <div class="heal-card good-border">
-        <h4>Monitor + agent repair</h4>
+        <h4>Self-healing &mdash; around the runs (on the host)</h4>
         <ul>
-          <li>A <b>cron tick runs every 15&nbsp;minutes</b> (zero LLM cost): it ingests finished runs, diffs them, updates this site, kicks the hourly scrape when due, kills stuck containers, and prunes old artifacts.</li>
-          <li>On top of that a <b>Claude Code agent reviews health</b> and, when a run <b>fails for a new reason</b> (e.g. the Tor-515 bug, or Smyths changing their markup), it diagnoses the cause from the logs, <b>patches the scraper code, rebuilds the Docker image, and pushes the fix</b> to the <a href="https://github.com/philipposk/smyths-scraper">smyths-scraper</a> repo &mdash; the next run picks it up.</li>
-          <li>The Tor-515 fix below was done exactly this way: detected, diagnosed, patched, pushed. Every code change lands as a normal commit you can review.</li>
+          <li>The 15-minute tick kills a container that overruns, lets the next tick retry, and records a failed run on the timeline with its error tail.</li>
+          <li>A Claude Code agent reviews health and, when a run fails for a new reason (markup drift, a provider change), diagnoses it from the logs, patches the scraper code, rebuilds the image, and pushes to the <a href="https://github.com/philipposk/smyths-scraper">smyths-scraper</a> repo. The next run picks up the fix.</li>
+          <li>Every code change lands as a normal commit; see the Agent activity feed below.</li>
         </ul>
       </div>
     </div>
+    <p class="runs-where"><b>What runs where:</b> the container is the scrape plus its resilience. The host holds the schedule, the diff/timeline, the dashboard, and the repair agent &mdash; none of which ships to a deployment of the container.</p>
     <h4 style="margin:18px 0 8px">Recent failure / heal events</h4>
     <div id="healWrap"><div class="empty">No failures recorded yet.</div></div>
   </section>
 
   <section id="agent">
     <h2>Agent activity</h2>
-    <p>What the Claude Code agent has actually done to this project &mdash; fixes, improvements, and reviews &mdash; newest first. Every entry corresponds to a real commit you can review in the repos.</p>
+    <p>Fixes, improvements and reviews the Claude Code agent has made, newest first. Each maps to a commit in the repos.</p>
     <div id="agentWrap"><div class="empty">Loading agent activity&hellip;</div></div>
+  </section>
+
+  <section id="integration">
+    <h2>Where this plugs in</h2>
+    <p>This is a demo, so the integration points still being agreed use sensible placeholders. None of them touch the scrape engine — they are where it reads input and writes output.</p>
+    <table class="plug-table">
+      <thead><tr><th>Integration point</th><th>What the demo uses</th></tr></thead>
+      <tbody>
+        <tr><td>Output schema</td><td>a <code>factory</code> JSON shape in <code>transform.js</code> &mdash; swap the mapper for the real field contract</td></tr>
+        <tr><td>URL list source</td><td>a fixed file of 40 URLs; the job already takes a list, so this is just where the list is read from</td></tr>
+        <tr><td>Trigger</td><td>a local 15-minute cron; in production a worker, queue or scheduler calls the job instead</td></tr>
+        <tr><td>Runtime</td><td>a Docker <code>linux/amd64</code> image &mdash; the same image runs anywhere that env runs</td></tr>
+        <tr><td>Output sink</td><td>NDJSON committed to this repo; point it at a bucket, a database or a callback</td></tr>
+      </tbody>
+    </table>
+    <p>Most of the moving parts are optional and switch off with a single env var &mdash; no code change:</p>
+    <ul class="flag-list">
+      <li><code>SOLVE_ENABLED=0</code> &mdash; turn the captcha solver off entirely (a challenged exit is simply rotated away).</li>
+      <li><code>USE_TOR=0</code> &mdash; run direct, no Tor, no rotation.</li>
+      <li><code>SOLVE_PAID_FALLBACK=0</code> &mdash; never call a paid solver (default; set to 1 with a key to enable).</li>
+      <li>unset <code>CAPTCHA_DUMP_DIR</code> &mdash; stop saving puzzle screenshots.</li>
+    </ul>
+    <p>Once the schema, list source, trigger, runtime and output sink are confirmed, only that input/output layer changes.</p>
   </section>
 
   <section id="repos">
@@ -459,19 +494,19 @@
     <div class="links">
       <div class="link-card">
         <h4><a href="https://github.com/philipposk/smyths-scraper">philipposk/smyths-scraper</a><span class="badge">private</span></h4>
-        <p>The scraper itself: patchright runner, Tor wiring, vision-LLM captcha solver, Dockerfile, hourly cron unit. Request access from Philippos.</p>
+        <p>The single-shot engine: patchright runner, Tor wiring, vision-LLM captcha solver, Dockerfile. Request access from Philippos.</p>
       </div>
       <div class="link-card">
         <h4><a href="https://github.com/philipposk/3.6x7.gr">philipposk/3.6x7.gr</a><span class="badge">public</span></h4>
-        <p>This site. Hourly the scraper commits new JSON files here; GitHub Pages serves them; this page renders them client-side.</p>
+        <p>This site and its orchestration: the 15-minute tick, the diff and timeline scripts, and the rendered dashboard.</p>
       </div>
       <div class="link-card">
         <h4><a href="https://1.6x7.gr">1.6x7.gr</a><span class="badge">previous</span></h4>
-        <p>The one-shot precursor: a single backfill of 58,605 UK Smyths products. This project is the recurring-watcher follow-up, deliberately scoped to 40 URLs to prove robustness + diffing.</p>
+        <p>The one-shot precursor: a single backfill of 58,605 UK Smyths products. This project is the recurring-watcher follow-up, scoped to 40 URLs to prove change detection.</p>
       </div>
       <div class="link-card">
-        <h4>hydrascrape <span class="badge">downstream</span></h4>
-        <p>The captcha solver here is mirrored into the hydrascrape codebase on Tamas &amp; Amine's side as a drop-in module.</p>
+        <h4>hydrascrape <span class="badge">lineage</span></h4>
+        <p>The broader scraping toolkit this engine was extracted from &mdash; multi-lane orchestration and other targets beyond Smyths.</p>
       </div>
     </div>
   </section>
@@ -694,9 +729,9 @@
             '</span>' +
             '<span class="meta-mini" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">' +
               (!isNaN(capDet)
-                ? (capDet === 0 ? 'no captcha' : '🧩 ' + capSol + '/' + capDet + (capPct !== null ? ' (' + capPct + '%)' : ''))
+                ? (capDet === 0 ? 'no captcha' : 'captcha ' + capSol + '/' + capDet + (capPct !== null ? ' (' + capPct + '%)' : ''))
                 : '') +
-              (!isNaN(tor) ? '  ·  🔁 ' + tor + ' rot' : '') +
+              (!isNaN(tor) ? '  ·  ' + tor + (tor === 1 ? ' rotation' : ' rotations') : '') +
             '</span>' +
             '<span class="ago">' + escapeHtml(fmtRel(r.ts)) + '</span>' +
           '</summary>' +
