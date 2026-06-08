@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-06-08T18:49:34.910Z",
+  "finishedAt": "2026-06-08T18:53:31.288Z",
+  "attempted": 40,
+  "success": 40,
+  "successRatePct": 100,
+  "breakdown": {
+    "attempted": 40,
+    "success": 40,
+    "redirect": 0,
+    "captchaFail": 0,
+    "block": 0,
+    "parseFail": 0,
+    "error": 0
+  },
+  "captchas": {
+    "detected": 1,
+    "solved": 1,
+    "unsupported": 0,
+    "failed": 0
+  },
+  "torRotations": 0,
+  "failures": []
+}

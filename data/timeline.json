@@ -1,5 +1,28 @@
 [
   {
+    "ts": "20260608T184919Z",
+    "status": "success",
+    "attempted": 40,
+    "success": 40,
+    "successRatePct": 100,
+    "captchas": {
+      "detected": 1,
+      "solved": 1
+    },
+    "torRotations": 0,
+    "changeCount": 0,
+    "durationSec": 236,
+    "breakdown": {
+      "attempted": 40,
+      "success": 40,
+      "redirect": 0,
+      "captchaFail": 0,
+      "block": 0,
+      "parseFail": 0,
+      "error": 0
+    }
+  },
+  {
     "ts": "20260608T183044Z",
     "status": "success",
     "env": "docker (linux/amd64)",

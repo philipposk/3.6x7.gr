@@ -1,0 +1,16 @@
+[
+  {
+    "ts": "2026-06-08T18:50:26.058Z",
+    "runTag": "20260608T184919Z",
+    "type": "doodle",
+    "vendor": "imperva",
+    "attempt": 2,
+    "solved": true,
+    "legend": [
+      "clock",
+      "megaphone",
+      "dinosaur"
+    ],
+    "image": "20260608T184919Z_doodle_a02_solved.png"
+  }
+]
