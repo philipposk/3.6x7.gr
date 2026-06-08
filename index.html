@@ -229,6 +229,41 @@
   .issue b { color: var(--fg); font-weight: 600; }
   .issue .sep { color: var(--muted); margin: 0 6px; }
 
+  /* Note box */
+  .note-box {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-left: 3px solid var(--muted); border-radius: 6px;
+    padding: 10px 14px; font-size: 13.5px; color: var(--fg-dim); margin: 8px 0 16px;
+  }
+  .note-box code { color: var(--fg); background: var(--bg-elev); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* Captcha gallery */
+  .captcha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .cap-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cap-card.solved { border-color: var(--good); }
+  .cap-card.failed { border-color: var(--bad); }
+  .cap-card img { width: 100%; display: block; background: #0c0e12; }
+  .cap-meta { padding: 8px 10px; font-family: var(--mono); font-size: 11.5px; color: var(--fg-dim); }
+  .cap-verdict { font-weight: 700; }
+  .cap-verdict.solved { color: var(--good); }
+  .cap-verdict.failed { color: var(--bad); }
+  .cap-legend { color: var(--muted); margin-top: 3px; word-break: break-word; }
+
+  /* Self-heal columns */
+  .heal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .heal-cols { grid-template-columns: 1fr; } }
+  .heal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .heal-card.good-border { border-left: 3px solid var(--good); }
+  .heal-card h4 { margin: 0 0 8px; font-family: var(--mono); font-size: 13px; color: var(--fg); }
+  .heal-card ul { margin: 0; padding-left: 18px; }
+  .heal-card li { font-size: 13px; color: var(--fg-dim); margin: 5px 0; }
+  .heal-card li b { color: var(--fg); }
+  .heal-event {
+    background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--bad);
+    border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 13px; color: var(--fg-dim);
+  }
+  .heal-event .he-ts { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
   /* Links grid */
   .links { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
   .link-card {
@@ -284,6 +319,7 @@
     <a href="#how">how</a>
     <a href="#timeline">timeline</a>
     <a href="#changes">changes</a>
+    <a href="#captchas">captchas</a>
     <a href="#issues">issues</a>
     <a href="#heal">self-heal</a>
     <a href="#repos">repos</a>
@@ -319,8 +355,8 @@
   <section id="how">
     <h2>How it works</h2>
     <ul class="flow">
-      <li>Hourly cron on the maintainer's laptop kicks the Docker container.</li>
-      <li>Container boots: <code>Tor</code> daemon up, <code>Xvfb</code> virtual display up, <code>patchright</code> launches a real headed Chromium.</li>
+      <li>An hourly tick on the maintainer's laptop kicks the Docker container (a monitor also runs every ~4.5&nbsp;min to ingest results, push, and catch stuck/failed runs).</li>
+      <li>Container boots: <code>Tor</code> daemon up, <code>Xvfb</code> virtual display up, then a <b>self-check</b> verifies Tor control auth + <code>NEWNYM</code> works (refuses to start if not), then <code>patchright</code> launches a real headed Chrome.</li>
       <li>One warm session against the Smyths homepage to clear Imperva's initial challenge and pick up cookies.</li>
       <li>For each of the 40 product URLs: fetch in-page, extract JSON-LD + DOM fallbacks, normalise to a flat record.</li>
       <li>If an exit hits an hCaptcha doodle, a free vision-LLM solver (Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia) reads the legend, locates the targets, and clicks in order with human-like jitter.</li>
@@ -342,28 +378,59 @@
   <section id="changes">
     <h2>Last detected changes</h2>
     <p>Field-level diff from the most recent run. Price moves are coloured <span style="color:var(--good)">down</span> / <span style="color:var(--bad)">up</span>.</p>
+    <p class="note-box"><strong>Compared against what?</strong> Each run is diffed against the <em>immediately previous run's snapshot</em> &mdash; the product records stored in this repo at <code>data/runs/&lt;previous-timestamp&gt;.ndjson</code>. Matching is by product SKU. The very first run has nothing to compare against, so every product counts as <em>new</em>; from the second run onward you see only what actually moved (price, in-stock, name, image, category). <span id="changesCompareLine"></span></p>
     <div id="changesWrap">
       <div class="empty">Loading changes&hellip;</div>
     </div>
   </section>
 
+  <section id="captchas">
+    <h2>Captchas the solver saw</h2>
+    <p>When a Tor exit gets challenged, Smyths shows an hCaptcha &ldquo;select in order&rdquo; doodle puzzle. The free vision-LLM solver reads the legend, locates each target, and clicks in order. Below is what it actually faced this run &mdash; the coloured rings are where the solver clicked &mdash; with the verdict. <span id="captchaRate" class="mono"></span></p>
+    <div id="captchaWrap" class="captcha-grid">
+      <div class="empty">Loading captchas&hellip;</div>
+    </div>
+  </section>
+
   <section id="issues">
     <h2>Issues we hit + how we solved them</h2>
+    <p class="note-box">Real problems from building + running this, newest first. The Tor-rotation bug below was found and fixed <em>on this very deployment</em> &mdash; the failed run on the timeline is it.</p>
     <div class="issues">
-      <div class="issue"><b>Vanilla Playwright + stealth was blocked instantly by Imperva.</b><span class="sep">&rarr;</span>Switched to <code>patchright</code>, a Chromium fork that strips the CDP signals Imperva fingerprints.</div>
-      <div class="issue"><b>Headless mode was detected even with stealth.</b><span class="sep">&rarr;</span>Run a real headed Chrome inside <code>Xvfb</code> (a virtual display) in the container. No pixels rendered to a screen, but Chrome behaves as if there were one.</div>
-      <div class="issue"><b>A single exit IP got rate-limited within a handful of requests.</b><span class="sep">&rarr;</span>Local <code>Tor</code> instance; on consecutive failures the runner sends <code>SIGNAL NEWNYM</code> over the control port to rotate the exit circuit.</div>
-      <div class="issue"><b>hCaptcha doodle puzzles appeared on some exits.</b><span class="sep">&rarr;</span>Free vision-LLM solver chained across Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia. It reads the legend, locates each target doodle, and clicks them in order with small human-like timing jitter.</div>
-      <div class="issue"><b>Retina screenshots came back at 2&times; the page coords, so clicks landed at half-coordinates.</b><span class="sep">&rarr;</span>Pass <code>scale: 'css'</code> to <code>page.screenshot()</code> so the solver and the page share a coordinate system.</div>
-      <div class="issue"><b>Net-zero stall: everything blocked for a full cycle.</b><span class="sep">&rarr;</span>Supervisor escalates to a free-proxy fallback. In this hourly job mode we just let the next cron tick retry &mdash; one bad hour is a row in the timeline, not an incident.</div>
-      <div class="issue"><b>Transient <code>apt-get</code> failure during the Docker build.</b><span class="sep">&rarr;</span>The Dockerfile is idempotent; a plain rerun cleared it. No source change required.</div>
+      <div class="issue"><b>In the container, Tor exit rotation silently did nothing &mdash; the first container run got stuck on a flagged exit and failed.</b><span class="sep">&rarr;</span>The Dockerfile had baked a control-port password <em>hash</em> that didn't match the plaintext the app sends (<code>tor --hash-password</code> uses a random salt each call). Every <code>SIGNAL NEWNYM</code> failed auth (<code>515</code>), so the scraper could never leave a bad exit. Three-part fix: the hash is now generated <em>at build time</em> from the real password so it always matches; <code>rotateExit()</code> now parses Tor's reply and only reports success on a real <code>250 OK</code> (it used to report success even on auth failure); and the container runs a <em>boot-time self-check</em> that refuses to start if rotation auth is broken.</div>
+      <div class="issue"><b>Free vision providers (Gemini, Groq) returned <code>503</code>/<code>429</code> under load, so the captcha solver couldn't read the puzzle.</b><span class="sep">&rarr;</span>Providers are chained (Gemini&nbsp;native &rarr; Gemini &rarr; OpenRouter Qwen3-VL &rarr; Groq &rarr; Nvidia) and rotate on rate-limit/5xx. When all free tiers are saturated, the lane rotates the Tor exit instead &mdash; a fresh exit often isn't challenged at all. Transient overload is recovered from, not a code bug.</div>
+      <div class="issue"><b>Vanilla Playwright + stealth was blocked instantly by Imperva.</b><span class="sep">&rarr;</span>Switched to <code>patchright</code>, a Chromium fork that strips the CDP automation signals Imperva fingerprints.</div>
+      <div class="issue"><b>Headless mode was detected even with stealth.</b><span class="sep">&rarr;</span>Run a real headed Chrome inside <code>Xvfb</code> (a virtual display) in the container. Nothing is drawn to a physical screen, but Chrome behaves as if it had one &mdash; this is exactly what lets it run in a Linux container with no GUI.</div>
+      <div class="issue"><b>A single exit IP got rate-limited within a handful of requests.</b><span class="sep">&rarr;</span>Local <code>Tor</code> instance; on consecutive failures the runner sends <code>SIGNAL NEWNYM</code> over the control port to rotate the exit circuit (free, instant).</div>
+      <div class="issue"><b>hCaptcha doodle puzzles appeared on some exits.</b><span class="sep">&rarr;</span>Free vision-LLM solver reads the legend, locates each target doodle as normalised 0&ndash;1000 coordinates, and clicks them in order with human-like timing jitter. See the gallery above for live examples + verdicts.</div>
+      <div class="issue"><b>Retina screenshots came back at 2&times; the page coords, so clicks landed at half-coordinates.</b><span class="sep">&rarr;</span>Pass <code>scale: 'css'</code> to <code>page.screenshot()</code> so the solver and the page share one coordinate system.</div>
+      <div class="issue"><b>Transient <code>apt-get</code> failure during the Docker build (mirror hiccup).</b><span class="sep">&rarr;</span>The Dockerfile is idempotent; a plain rerun cleared it. No source change required.</div>
     </div>
   </section>
 
   <section id="heal">
     <h2>Self-healing</h2>
-    <p>A run is considered failed if the process exits non-zero, lands zero successful product records, or every page comes back blocked. When that happens the runner writes a failure event to <code>timeline.json</code> with the tail of stderr, retries once with a fresh Tor circuit, and (planned) opens a GitHub issue on the scraper repo with the same payload.</p>
-    <p>Code-level self-heal &mdash; the kind where the agent would rewrite a selector because the markup drifted &mdash; is logged for a human to review. Nothing is auto-merged. The point of hourly cadence is that drift is caught within an hour; the point of human review is that the fix is intentional.</p>
+    <p>Being precise about what's automatic vs. what's a human, because it matters:</p>
+    <div class="heal-cols">
+      <div class="heal-card good-border">
+        <h4>Automatic (every run, no human)</h4>
+        <ul>
+          <li><b>Tor exit rotation</b> &mdash; on consecutive failures or a flagged exit, <code>SIGNAL NEWNYM</code> picks a fresh circuit.</li>
+          <li><b>Vision-provider rotation</b> &mdash; on rate-limit/5xx the solver falls through Gemini &rarr; OpenRouter &rarr; Groq &rarr; Nvidia.</li>
+          <li><b>Boot self-check</b> &mdash; the container refuses to start if Tor control auth is broken (the exact bug that caused the first failed run).</li>
+          <li><b>Stuck-run kill</b> &mdash; a monitor tick kills any scrape running past 20&nbsp;min and logs it as a failed run.</li>
+          <li><b>Failure &rarr; timeline</b> &mdash; a non-zero exit, zero successes, or all-blocked becomes a timeline row with the stderr tail + a classified cause.</li>
+        </ul>
+      </div>
+      <div class="heal-card">
+        <h4>Human-in-the-loop (honest)</h4>
+        <ul>
+          <li><b>Code fixes</b> &mdash; when a run fails for a <em>new</em> reason (e.g. the Tor-515 bug, or Smyths changing markup), the cause is diagnosed, the code is patched, the image rebuilt, and the fix pushed to the scraper repo. The system does <em>not</em> rewrite its own code unattended.</li>
+          <li><b>Why not auto-merge?</b> Hourly cadence means drift is caught within an hour; human review means the fix is intentional, not a guess that compounds.</li>
+        </ul>
+      </div>
+    </div>
+    <h4 style="margin:18px 0 8px">Recent failure / heal events</h4>
+    <div id="healWrap"><div class="empty">No failures recorded yet.</div></div>
   </section>
 
   <section id="repos">
@@ -634,9 +701,24 @@
 
   function renderChanges(payload) {
     const wrap = $('changesWrap');
+    // Spell out exactly what this run was compared against.
+    const cmp = $('changesCompareLine');
+    if (cmp) {
+      if (payload && payload.ts && payload.prevTs) {
+        const st = payload.stats || {};
+        cmp.innerHTML = 'This run (<code>' + escapeHtml(payload.ts) + '</code>) was compared against the previous run (<code>' +
+          escapeHtml(payload.prevTs) + '</code>): ' + (st.compared != null ? st.compared : '?') + ' products matched by SKU, ' +
+          (st.changed || 0) + ' changed, ' + (st.newProducts || 0) + ' new, ' + (st.droppedProducts || 0) + ' dropped.';
+      } else if (payload && payload.ts && !payload.prevTs) {
+        cmp.innerHTML = 'This was the <strong>first</strong> run (<code>' + escapeHtml(payload.ts) + '</code>) &mdash; no prior snapshot, so all ' +
+          ((payload.stats && payload.stats.newProducts) || 0) + ' products are new.';
+      } else {
+        cmp.textContent = '';
+      }
+    }
     const changes = payload && Array.isArray(payload.changes) ? payload.changes : [];
     if (!changes.length) {
-      wrap.innerHTML = '<div class="empty">No drift detected in the last run. Catalog is stable.</div>';
+      wrap.innerHTML = '<div class="empty">No drift detected vs the previous run. Catalog is stable.</div>';
       return;
     }
     const ts = payload && payload.ts;
@@ -670,21 +752,73 @@
       '</table>';
   }
 
+  // --- Captcha gallery ----------------------------------------------------
+  function renderCaptchas(manifest) {
+    const wrap = $('captchaWrap');
+    const rate = $('captchaRate');
+    const list = Array.isArray(manifest) ? manifest : [];
+    if (!list.length) {
+      wrap.innerHTML = '<div class="empty">No captcha encountered recently &mdash; the Tor exits drawn so far cleared without a wall. Saved puzzles appear here when one shows up.</div>';
+      if (rate) rate.textContent = '';
+      return;
+    }
+    const solved = list.filter((c) => c.solved).length;
+    const pct = Math.round((solved / list.length) * 100);
+    if (rate) rate.textContent = 'Last ' + list.length + ' puzzles: ' + solved + ' solved (' + pct + '%).';
+    wrap.innerHTML = list.slice(0, 24).map((c) => {
+      const v = c.solved ? 'solved' : 'failed';
+      const legend = Array.isArray(c.legend) && c.legend.length ? c.legend.join(' · ') : '';
+      const src = 'data/captchas/' + encodeURIComponent(c.image);
+      return '<div class="cap-card ' + v + '">' +
+        (c.image ? '<a href="' + src + '" target="_blank" rel="noopener"><img loading="lazy" src="' + src + '" alt="captcha puzzle"></a>' : '') +
+        '<div class="cap-meta">' +
+          '<span class="cap-verdict ' + v + '">' + (c.solved ? '✓ solved' : '✗ failed') + '</span>' +
+          ' · attempt ' + (c.attempt || 1) +
+          '<div class="cap-legend">' + (legend ? 'legend: ' + escapeHtml(legend) : (c.vendor || '') + ' ' + (c.type || '')) + '</div>' +
+          '<div class="he-ts">' + escapeHtml(fmtTs(c.ts)) + ' · ' + escapeHtml(fmtRel(c.ts)) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // --- Self-heal / failure events (data-driven from the timeline) ---------
+  function renderHeal(timeline) {
+    const wrap = $('healWrap');
+    const fails = (timeline || []).filter((e) => statusOf(e) === 'bad' || e.status === 'failed')
+      .sort((a, b) => parseTs(b.ts).getTime() - parseTs(a.ts).getTime());
+    if (!fails.length) {
+      wrap.innerHTML = '<div class="empty">No failed runs recorded. Self-heal hooks are wired but unexercised since the last fix.</div>';
+      return;
+    }
+    wrap.innerHTML = fails.slice(0, 8).map((e) => {
+      return '<div class="heal-event">' +
+        '<div class="he-ts">' + escapeHtml(fmtTs(e.ts)) + ' · ' + escapeHtml(fmtRel(e.ts)) +
+          (e.env ? ' · ' + escapeHtml(e.env) : '') + (e.exitCode != null ? ' · exit ' + escapeHtml(e.exitCode) : '') + '</div>' +
+        (e.note ? '<div style="margin-top:4px">' + escapeHtml(e.note) + '</div>' : '') +
+        (e.errorTail ? '<div class="he-ts" style="margin-top:6px;white-space:pre-wrap;color:var(--bad)">' + escapeHtml(e.errorTail) + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
   // --- Load + refresh -----------------------------------------------------
   async function loadAll() {
     const results = await Promise.allSettled([
       fetchJson('data/timeline.json'),
       fetchJson('data/latest-changes.json'),
       fetchJson('data/run-summary.json'),
+      fetchJson('data/captchas/captchas.json'),
     ]);
 
     const timeline = results[0].status === 'fulfilled' && Array.isArray(results[0].value) ? results[0].value : [];
     const latestChanges = results[1].status === 'fulfilled' ? results[1].value : null;
     const summary = results[2].status === 'fulfilled' ? results[2].value : null;
+    const captchas = results[3].status === 'fulfilled' && Array.isArray(results[3].value) ? results[3].value : [];
 
     renderHero(summary, timeline);
     renderTimeline(timeline);
     renderChanges(latestChanges);
+    renderCaptchas(captchas);
+    renderHeal(timeline);
 
     $('lastRefresh').textContent = new Date().toLocaleString();
 

@@ -126,9 +126,12 @@ function kickIfDue() {
   const tag = nowTag();
   const name = `${NAME_PREFIX}${tag}`;
   const envFlag = fs.existsSync(ENV_FILE) ? `--env-file ${ENV_FILE}` : '';
+  const CAPTCHAS = path.join(DATA, 'captchas');
+  fs.mkdirSync(CAPTCHAS, { recursive: true });
   const cmd = `docker run -d --rm --platform linux/amd64 --name ${name} ${envFlag} ` +
     `-e SOLVE_ENABLED=1 -e SOLVE_FREE_ONLY=0 -e ROTATE_ON_FAILS=2 -e MAX_PER_RUN=${MAX_PER_RUN} ` +
-    `-v ${URLS}:/app/urls.txt:ro -v ${RUNS}:/out -v ${REPORTS}:/reports ` +
+    `-e CAPTCHA_DUMP_DIR=/captchas -e CAPTURE_RUN_TAG=${tag} ` +
+    `-v ${URLS}:/app/urls.txt:ro -v ${RUNS}:/out -v ${REPORTS}:/reports -v ${CAPTCHAS}:/captchas ` +
     `${IMAGE} run -i /app/urls.txt -o /out/${tag}.ndjson -r /reports/${tag}.json -s factory`;
   const r = shSafe(cmd);
   if (r.ok) { log(`kick: launched ${name} (container ${r.out.trim().slice(0, 12)})`); return tag; }
