@@ -1,5 +1,12 @@
 [
   {
+    "ts": "2026-06-08T19:25:00Z",
+    "kind": "improve",
+    "title": "Separated resilience from self-healing; added an integration section",
+    "detail": "Reworked the Reliability section so in-run fault tolerance (Tor/provider rotation, boot check — inside the container) is distinct from self-healing (host-side recovery + the code-repair agent), with a clear 'what runs where' note. Added a 'Where this plugs in' section covering the integration points still being agreed and the env flags that switch features off without code changes.",
+    "repo": "3.6x7.gr"
+  },
+  {
     "ts": "2026-06-08T19:05:00Z",
     "kind": "improve",
     "title": "Documentation + site staleness sweep",
